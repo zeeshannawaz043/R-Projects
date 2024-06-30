@@ -1,0 +1,264 @@
+---
+title: "Price Prediction of Avocados  using R"
+author: "ABC"
+date: "2024-03-31"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+# Import libraries
+
+```{r}
+library(ggplot2)
+library(dplyr)
+library(stats)
+library(ggfortify)
+library(psych)
+library(stats)
+```
+
+
+```{r}
+#import the data sets
+data <- read.csv("avocado.csv")
+
+# head of the dataset
+head(data)
+
+str(data)
+
+```
+
+
+# Data CLeaning
+
+
+```{r}
+#Find the missing values from the dataset with rescpt to each column
+print(colSums(is.na(data)))
+
+```
+
+
+```{r}
+duplicated_rows <- duplicated(data)
+sum(duplicated_rows) # This will give you the count of duplicate rows
+```
+
+
+```{r}
+# Converting the data types
+
+data$Date <- as.Date(data$Date)
+data$type <- as.factor(data$type)
+data$region <- as.factor(data$region)
+
+str(data)
+```
+```{r}
+# remove extra columns
+
+data$X<-NULL
+```
+
+
+# Exploratory Data Analsyis
+
+
+```{r}
+# finds the summary of the dataset
+summary(data)
+```
+
+
+
+```{r}
+ggplot(data, aes(x = AveragePrice)) +
+  geom_histogram(binwidth = 0.1, fill = "blue", color = "black") +
+  theme_minimal() +
+  labs(x = "Average Price", y = "Frequency", title = "Distribution of Average Avocado Price")
+
+```
+
+
+```{r}
+ggplot(data, aes(x = Total.Volume, y = AveragePrice)) +
+  geom_point(alpha = 0.5) +
+  theme_light() +
+  labs(x = "Total Volume", y = "Average Price", title = "Average Price vs Total Volume")
+
+
+```
+
+
+```{r}
+ggplot(data, aes(x = type, y = AveragePrice)) +
+  geom_boxplot(fill = c("lightblue", "lightgreen")) +
+  labs(title = "Average Price by Type", x = "Type", y = "Average Price")
+
+
+```
+
+```{r}
+data$Month <- format(data$Date, "%m")  # Extract month as a string "01" for January, "02" for February, etc.
+ggplot(data, aes(x = Month, y = Total.Volume, fill = type)) +
+  geom_bar(stat = "summary", fun = sum, position = position_dodge()) +
+  labs(title = "Total Volume by Month and Type", x = "Month", y = "Total Volume")
+
+```
+
+```{r}
+ggplot(data, aes(x = Date, y = AveragePrice)) +
+  geom_line(group = 1, color = "red") +
+  theme_bw() +
+  labs(x = "Date", y = "Average Price", title = "Time Series of Average Avocado Price")
+```
+
+
+
+```{r}
+avg_price_per_region <- aggregate(AveragePrice ~ region, data = data, FUN = mean)
+ggplot(avg_price_per_region, aes(x = reorder(region, -AveragePrice), y = AveragePrice)) +
+  geom_bar(stat = "identity", fill = "green") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+  labs(x = "Region", y = "Average Price", title = "Average Avocado Price per Region")
+
+```
+
+
+```{r}
+ggplot(data, aes(x = type, y = Total.Volume, fill = type)) +
+  geom_bar(stat = "identity") +
+  labs(title = "Total Volume Sold by Type", x = "Type", y = "Total Volume")
+
+
+```
+
+
+```{r}
+ggplot(data, aes(x = Month, y = Total.Bags, fill = type)) +
+  geom_bar(stat = "summary", fun = sum, position = position_dodge()) +
+  scale_fill_manual(values = c("conventional" = "steelblue", "organic" = "darkorange")) +
+  labs(title = "Seasonal Variation in Total Bags Sold by Type", x = "Month", y = "Total Bags")
+
+
+```
+
+
+
+```{r}
+ggplot(data, aes(x = Date, y = AveragePrice)) +
+  geom_line() +
+  geom_smooth(method = "loess", color = "red") +
+  theme_bw() +
+  labs(x = "Date", y = "Average Price", title = "Average Price over Time with Trend Line")
+
+```
+
+
+```{r}
+library(corrplot)
+# Assuming 'data' is your dataframe
+numeric_data <- data[, sapply(data, is.numeric)]  # Select only numeric columns
+
+# Compute the correlation matrix
+cor_matrix <- cor(numeric_data, use = "complete.obs") # 'use' parameter handles missing values
+
+# Create the correlation plot
+corrplot(cor_matrix, 
+         method = "color",    # Use color shading to indicate correlation strength
+         type = "upper",      # Display only the upper half of the matrix
+         order = "AOE",       # Order variables using the Angular Order of the Eigenvectors
+         addCoef.col = "grey", # Color for the correlation coefficients
+         tl.col = "black",     # Text label color
+         tl.srt = 45,         # Text label rotation in degrees
+         number.cex = 0.60)   # Size of the correlation coefficients
+
+
+```
+
+
+
+```{r}
+str(data)
+```
+
+# Model Fitting
+
+
+
+```{r}
+
+
+# Load the packages
+library(forecast)
+library(tseries)
+
+
+data <- ts(data$AveragePrice, start = c(2015, 1), frequency = 52)  # Assuming yearly data
+
+# Check for stationarity
+adf.test(data, alternative = "stationary")
+
+# If the data is not stationary, difference the data
+diff_data <- diff(data)
+
+# Identify ARMA order using ACF and PACF
+acf(diff_data)
+pacf(diff_data)
+```
+
+
+```{r}
+# Fit ARMA model (example with p=1, q=1)
+arma_model <- arima(data, order=c(1,0,1))
+summary(arma_model)
+```
+
+```{r}
+# Fit ARIMA model (example with p=1, d=1, q=1)
+arima_model <- arima(data, order=c(1,1,1))
+summary(arima_model)
+```
+
+```{r}
+# Compare AIC
+AIC(arma_model)
+AIC(arima_model)
+```
+
+
+# Forecasting
+
+```{r}
+
+
+# Create the time series data
+data <- ts(rnorm(60), start = c(2015, 1), frequency = 12)  # Example random data
+
+# Define the train and test data
+train_data <- window(data, end=c(2018, 12))  # train on data up to December 2018
+test_data <- window(data, start=c(2019, 1), end=c(2019, 12))  # test on data for year 2019
+
+# Fit the ARIMA model on the training set
+model <- arima(train_data, order=c(1,1,1))
+
+# Forecast the next 12 months (which should align with the test set period)
+forecasts <- forecast(model, h=12)
+
+# Plot the forecasts against the actual data
+plot(forecasts)
+lines(test_data, col='red', type='o')
+
+# Evaluate the forecast accuracy on the test set
+accuracy(forecasts, test_data)
+
+
+
+```
+
+
